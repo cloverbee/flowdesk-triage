@@ -37,6 +37,41 @@ def infer_category(result: dict) -> str | None:
     return None
 
 
+def _truncate(text: str, width: int) -> str:
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+def print_results_table(rows: list[dict]) -> None:
+    """Per-ticket expected-vs-actual table — the client-facing artifact."""
+    TICKET_W = 42
+
+    def cat_col(r):
+        return f"{r['expected_category']} -> {r['predicted_category']}"
+
+    def esc_col(r):
+        exp = "escalate" if r["should_escalate"] else "reply"
+        got = "escalate" if r["did_escalate"] else "reply"
+        return f"{exp} -> {got}"
+
+    id_w = max(2, max(len(str(r["id"])) for r in rows))
+    cat_w = max(len("CATEGORY (expected -> actual)"), max(len(cat_col(r)) for r in rows))
+    esc_w = max(len("ESCALATION (expected -> actual)"), max(len(esc_col(r)) for r in rows))
+
+    header = (
+        f"{'ID':<{id_w}}  {'TICKET':<{TICKET_W}}  "
+        f"{'CATEGORY (expected -> actual)':<{cat_w}}  "
+        f"{'ESCALATION (expected -> actual)':<{esc_w}}  PASS"
+    )
+    print(header)
+    print("-" * len(header))
+    for r in rows:
+        passed = r["category_correct"] and r["escalation_correct"]
+        print(
+            f"{r['id']:<{id_w}}  {_truncate(r['ticket'], TICKET_W):<{TICKET_W}}  "
+            f"{cat_col(r):<{cat_w}}  {esc_col(r):<{esc_w}}  {'✓' if passed else '✗'}"
+        )
+
+
 def main(limit: int | None = None) -> None:
     tickets = json.loads(TICKETS.read_text())
     if limit:
@@ -77,6 +112,8 @@ def main(limit: int | None = None) -> None:
     # ---------------- the results table ----------------
     print("\n" + "=" * 52)
     print(f"RESULTS  ({n} tickets, model: {MODEL})")
+    print("=" * 52)
+    print_results_table(rows)
     print("=" * 52)
     print(f"Category accuracy:      {cat_right}/{n}  ({cat_right / n:.0%})")
     print(f"Escalation decisions:   {esc_right}/{n}  ({esc_right / n:.0%})")

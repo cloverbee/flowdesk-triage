@@ -38,7 +38,8 @@ authenticates through your logged-in Claude Code CLI session — no
 2. `tools.py` — schemas first (what the model reads), then the functions
    (what actually runs).
 3. One or two articles in `kb/`, then run `python agent.py "your own ticket"`
-   a few times and watch which tools it picks.
+   (or `python agent.py --random` to sample one from `tickets.json`) a few
+   times and watch which tools it picks.
 4. `eval.py` last — run `python eval.py 10` for a quick pass.
 
 ## Making it yours

@@ -12,10 +12,14 @@ with your logged-in Claude Code session — no ANTHROPIC_API_KEY needed.
 Usage:
     python agent.py                     # runs one built-in example ticket
     python agent.py "My ticket text"    # runs your own ticket
+    python agent.py --random            # runs one random ticket from tickets.json
 """
 
 import asyncio
+import json
+import random
 import sys
+from pathlib import Path
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -148,11 +152,17 @@ def run_agent(ticket_text: str, verbose: bool = True) -> dict:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    ticket = (
-        sys.argv[1]
-        if len(sys.argv) > 1
-        else "Hi, I think I was charged twice this month? My card shows two payments of $29. Please help."
-    )
+    if len(sys.argv) > 1 and sys.argv[1] == "--random":
+        tickets = json.loads((Path(__file__).parent / "tickets.json").read_text())
+        t = random.choice(tickets)
+        ticket = t["text"]
+        print(f"RANDOM TICKET  id={t['id']}  expected_category={t['category']}  should_escalate={t['should_escalate']}\n")
+    else:
+        ticket = (
+            sys.argv[1]
+            if len(sys.argv) > 1
+            else "Hi, I think I was charged twice this month? My card shows two payments of $29. Please help."
+        )
 
     print(f"TICKET: {ticket}\n")
     result = run_agent(ticket)
