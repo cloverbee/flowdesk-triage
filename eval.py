@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 from agent import run_agent, MODEL
+from report import write_html_report
 
 TICKETS = Path(__file__).parent / "tickets.json"
 TRACES_OUT = Path(__file__).parent / "eval_traces.json"
@@ -125,6 +126,9 @@ def main(limit: int | None = None) -> None:
 
     TRACES_OUT.write_text(json.dumps(rows, indent=2))
     print(f"\nFull traces written to {TRACES_OUT.name} — read five failures before changing anything.")
+
+    report_path = write_html_report(rows, MODEL, cost)
+    print(f"HTML report written to {report_path.name} — open it in a browser to share.")
 
     # ---------------- YOUR EXTENSION: LLM as judge ----------------
     # The checks above are objective: category and escalation have labeled

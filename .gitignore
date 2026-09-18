@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 escalations.log
 eval_traces.json
+eval_report.html
 README_tmp.html
 .DS_Store
 qdrant_data/
