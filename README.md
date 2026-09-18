@@ -10,8 +10,12 @@ authenticates through your logged-in Claude Code CLI session — no
 1. Python 3.10 or newer.
 2. Install and log in to Claude Code, if you haven't already: `npm install -g
    @anthropic-ai/claude-code`, then `claude` and follow the login prompt.
-3. `pip install -r requirements.txt` (installs `claude-agent-sdk`).
-4. Test: `python agent.py` — you should watch it classify a ticket, search
+3. `pip install -r requirements.txt` (installs `claude-agent-sdk` and `qdrant-client`).
+4. Build the knowledge base index: `python build_index.py` — embeds every
+   article in `kb/` into a local Qdrant collection on disk (`qdrant_data/`).
+   The first run downloads a small embedding model (~130MB) from Hugging
+   Face; after that it's fully offline. Re-run this any time `kb/` changes.
+5. Test: `python agent.py` — you should watch it classify a ticket, search
    the knowledge base, and draft a reply.
 
 ## What's in the box
@@ -21,6 +25,8 @@ authenticates through your logged-in Claude Code CLI session — no
 | `agent.py` | The agent loop. Read this first, top to bottom. | Day 1 |
 | `tools.py` | The three tools and their schemas. | Day 2 |
 | `kb/` | 12 support articles — the knowledge base the agent searches. | Day 3 |
+| `build_index.py` | Embeds `kb/` into a local Qdrant collection. Run before `agent.py`/`eval.py`, and again after editing `kb/`. | Day 3 |
+| `qdrant_data/` | Created at runtime by `build_index.py` — the on-disk vector index. Not committed; rebuild it instead. | Day 3 |
 | `tickets.json` | 50 labeled test tickets (category + escalation labels). | Day 7 |
 | `eval.py` | Runs the test set, prints your results table. | Day 7 |
 | `escalations.log` | Created at runtime — where escalations land. | Day 4 |
@@ -51,3 +57,5 @@ authenticates through your logged-in Claude Code CLI session — no
   nothing emails customers or moves money.
 - Ticket text is data, not instructions. See ticket 16 in the test set.
 - Rerun `eval.py` after every change. The table is your compass.
+- Qdrant's local mode is single-process, like SQLite — don't run
+  `build_index.py` at the same time as `agent.py` or `eval.py`.

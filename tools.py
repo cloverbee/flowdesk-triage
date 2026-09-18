@@ -13,17 +13,29 @@ Everything below runs through the Claude Agent SDK, which authenticates
 with your logged-in Claude Code CLI session — no ANTHROPIC_API_KEY needed.
 """
 
+import atexit
 import datetime
-import re
 from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, create_sdk_mcp_server, query, tool
+from qdrant_client import QdrantClient, models
 
-KB_DIR = Path(__file__).parent / "kb"
 ESCALATION_LOG = Path(__file__).parent / "escalations.log"
 
 CATEGORIES = ["billing", "login", "bug", "feature_request", "other"]
+
+# Must match build_index.py — that script is what populates this collection.
+QDRANT_PATH = Path(__file__).parent / "qdrant_data"
+KB_COLLECTION = "flowdesk_kb"
+EMBED_MODEL = "BAAI/bge-small-en-v1.5"
+KB_SCORE_THRESHOLD = 0.55  # cosine similarity below this: treat as "no relevant article"
+# Calibrated against this KB: genuine matches score ~0.7-0.85, unrelated
+# articles top out ~0.45-0.49 on off-topic queries. Retune if kb/ grows —
+# eval.py's escalation-accuracy column is the signal to watch.
+
+_qdrant = QdrantClient(path=str(QDRANT_PATH))
+atexit.register(_qdrant.close)  # local mode holds a file lock; close it before __del__ races shutdown
 
 
 # ---------------------------------------------------------------------------
@@ -70,14 +82,11 @@ async def classify_ticket(args: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Tool 2: search_kb
 # ---------------------------------------------------------------------------
-# A deliberately simple keyword search over the kb/ folder: score each
-# article by how many of the query's words it contains, return the top two.
-#
-# Production retrieval uses embeddings and a vector database (Day 3,
-# Topic 2). We use keyword scoring here so the whole package runs with no
-# extra infrastructure — and so you can read every line of how retrieval
-# happens. Swapping this function for an embedding search changes NOTHING
-# about the agent loop. That is the point.
+# Semantic retrieval: embed the query, search a local Qdrant collection built
+# by build_index.py, return the top two articles above a relevance floor.
+# Embeddings run through FastEmbed's local ONNX models — no server, no API
+# key. Swapping this function's implementation changes NOTHING about the
+# agent loop (Day 3, Topic 2) — that's still the point.
 
 @tool(
     "search_kb",
@@ -87,23 +96,31 @@ async def classify_ticket(args: dict[str, Any]) -> dict[str, Any]:
     {"query": str},
 )
 async def search_kb(args: dict[str, Any]) -> dict[str, Any]:
-    query_words = set(re.findall(r"[a-z]+", args["query"].lower())) - {
-        "the", "a", "an", "is", "are", "to", "of", "my", "i", "and", "for", "in", "on", "it",
-    }
+    try:
+        result = _qdrant.query_points(
+            collection_name=KB_COLLECTION,
+            query=models.Document(text=args["query"], model=EMBED_MODEL),
+            limit=2,
+            score_threshold=KB_SCORE_THRESHOLD,
+        )
+    except Exception as exc:
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"KB index unavailable ({exc}). Run `python build_index.py` first.",
+                }
+            ],
+            "is_error": True,
+        }
 
-    scored = []
-    for path in sorted(KB_DIR.glob("*.md")):
-        text = path.read_text().lower()
-        score = sum(text.count(w) for w in query_words)
-        scored.append((score, path))
-
-    scored.sort(reverse=True, key=lambda pair: pair[0])
-    top = [path for score, path in scored[:2] if score > 0]
-
-    if not top:
+    if not result.points:
         text = "NO_RESULTS: no knowledge base article matched this query."
     else:
-        parts = [f"--- ARTICLE: {path.name} ---\n{path.read_text().strip()}" for path in top]
+        parts = [
+            f"--- ARTICLE: {point.payload['filename']} ---\n{point.payload['text']}"
+            for point in result.points
+        ]
         text = "\n\n".join(parts)
 
     return {"content": [{"type": "text", "text": text}]}

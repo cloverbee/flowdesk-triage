@@ -4,3 +4,4 @@ escalations.log
 eval_traces.json
 README_tmp.html
 .DS_Store
+qdrant_data/
