@@ -6,3 +6,6 @@ eval_report.html
 README_tmp.html
 .DS_Store
 qdrant_data/
+
+grafana/.env
+grafana/.env.off

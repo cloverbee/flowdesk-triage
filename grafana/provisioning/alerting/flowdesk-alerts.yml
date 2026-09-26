@@ -1,0 +1,46 @@
+apiVersion: 1
+
+# One Grafana-managed alert rule: fires when sync-service logs more than 10
+# errors in 5 minutes. The seeder's sync_outage scenario trips it; switching
+# back to healthy lets it resolve once the errors age out of the window.
+groups:
+  - orgId: 1
+    name: flowdesk-services
+    folder: Flowdesk
+    interval: 30s
+    rules:
+      - uid: sync-error-rate
+        title: Sync service error rate high
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              expr: sum(count_over_time({service="sync-service", level="error"}[5m]))
+              queryType: instant
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+        noDataState: OK        # no error lines at all = healthy, not "no data"
+        execErrState: Error
+        for: 0s
+        labels:
+          service: sync-service
+          severity: critical
+        annotations:
+          summary: Tasks and comments are failing to save or sync across devices.
+          description: sync-service is logging write failures; engineering is paged.

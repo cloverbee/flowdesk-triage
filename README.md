@@ -24,12 +24,14 @@ authenticates through your logged-in Claude Code CLI session — no
 |---|---|---|
 | `agent.py` | The agent loop. Read this first, top to bottom. | Day 1 |
 | `tools.py` | The three tools and their schemas. | Day 2 |
-| `kb/` | 12 support articles — the knowledge base the agent searches. | Day 3 |
+| `kb/` | 13 support articles — the knowledge base the agent searches. | Day 3 |
 | `build_index.py` | Embeds `kb/` into a local Qdrant collection. Run before `agent.py`/`eval.py`, and again after editing `kb/`. | Day 3 |
 | `qdrant_data/` | Created at runtime by `build_index.py` — the on-disk vector index. Not committed; rebuild it instead. | Day 3 |
 | `tickets.json` | 50 labeled test tickets (category + escalation labels). | Day 7 |
 | `eval.py` | Runs the test set, prints your results table. | Day 7 |
 | `escalations.log` | Created at runtime — where escalations land. | Day 4 |
+| `grafana/` | Optional: local Grafana + Loki in Docker, so the agent can check live alerts and logs on bug tickets. See `grafana/README.md`. | Extension |
+| `tickets_grafana.json` | 6 tickets for the Grafana extension, run during the `sync_outage` scenario. | Extension |
 
 ## Reading order
 

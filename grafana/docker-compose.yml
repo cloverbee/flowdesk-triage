@@ -1,0 +1,41 @@
+# Local observability stack for the triage agent: Grafana + Loki + a log
+# seeder that writes fake Flowdesk service logs. See grafana/README.md.
+#
+#   docker compose -f grafana/docker-compose.yml up -d
+#   SCENARIO=sync_outage docker compose -f grafana/docker-compose.yml up -d seeder
+
+name: flowdesk-grafana
+
+services:
+  loki:
+    image: grafana/loki:3.7.8
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    depends_on: [loki]
+    ports:
+      - "127.0.0.1:3000:3000"   # loopback only: this stack is for your laptop
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning:ro
+
+  seeder:
+    image: python:3.12-alpine
+    depends_on: [loki]
+    environment:
+      SCENARIO: ${SCENARIO:-healthy}   # healthy | sync_outage
+      LOKI_URL: http://loki:3100
+    volumes:
+      - ./seeder/seed_logs.py:/seed_logs.py:ro
+    command: python -u /seed_logs.py
+
+# A fixed network name, so the mcp-grafana container that agent.py starts can
+# join it and reach Grafana at http://grafana:3000.
+networks:
+  default:
+    name: flowdesk-grafana
